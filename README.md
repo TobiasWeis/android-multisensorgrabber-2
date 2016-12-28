@@ -90,7 +90,7 @@ Below is a snippet from an example capture, names are adapted to a database syst
 ## TODO
 * Implement func to enable user to save all available camera settings and send to me
 * Upload functionality and db-integration in backend
-* Better control of camera parameters (see wiki)
+* ~~Better control of camera parameters~~ Now using camera2 API
 * ~~Settings Activity?~~
 * ~~choose framerate (and implement)~~
 * ~~gps grabbing~~
