@@ -6,7 +6,7 @@
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
-    <uses-feature android:name="android.hardware.camera2.full" />
+    <!-- <uses-feature android:name="android.hardware.camera2.full" /> -->
 
     <application
         android:allowBackup="true"
@@ -28,6 +28,13 @@
         <activity android:name=".AboutActivity" android:screenOrientation="landscape" android:configChanges="orientation|keyboardHidden">
             <intent-filter>
                 <action android:name="AboutView" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
+        <activity android:name=".ProbeActivity" android:screenOrientation="landscape" android:configChanges="orientation|keyboardHidden">
+            <intent-filter>
+                <action android:name="ProbeView" />
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity>

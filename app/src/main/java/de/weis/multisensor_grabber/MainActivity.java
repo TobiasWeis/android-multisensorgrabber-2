@@ -147,9 +147,13 @@ public class MainActivity extends Activity {
             // FIXME: if we have gps-permission, but gps is off, this fails!
             try {
                 textview_coords.setText("Coordinates: " + String.format("%.03f", _loc.getLatitude()) + ", " + String.format("%.03f", _loc.getLongitude()) + ", Acc:" + _loc.getAccuracy());
-            }catch(Exception e){
-                //Log.e("GPS", "---------------- NO GPS DATA");
-            };
+            }catch(Exception e){}
+
+            try{
+                bestProvider = mLocationManager.getBestProvider(criteria, false);
+                mLocationManager.requestLocationUpdates(bestProvider, 1,1, locationListener);
+            }catch(Exception e) {}
+
             textview_imu.setText("head: " + String.format("%.01f", _gyro_head) +
                     " pitch: " + String.format("%.01f", _gyro_pitch) +
                     " roll: " + String.format("%.01f", _gyro_roll) +
@@ -157,6 +161,7 @@ public class MainActivity extends Activity {
                     " ay " + String.format("%.01f", _accel_y) +
                     " az " + String.format("%.01f", _accel_z));
             textview_fps.setText(String.format("%.1f", 1000. / _diff) + " f/s");
+
             sys_handler.postDelayed(grab_system_data, 500);
         }
     };
@@ -437,12 +442,20 @@ public class MainActivity extends Activity {
                         try {
                             serializer.startTag(null, "Frame");
                             serializer.attribute(null, "uri", fname);
-                            serializer.attribute(null, "lat", "" + _loc.getLatitude());
-                            serializer.attribute(null, "lon", "" + _loc.getLongitude());
-                            serializer.attribute(null, "acc", "" + _loc.getAccuracy());
+                            try {
+                                serializer.attribute(null, "lat", "" + _loc.getLatitude());
+                                serializer.attribute(null, "lon", "" + _loc.getLongitude());
+                                serializer.attribute(null, "acc", "" + _loc.getAccuracy());
+                                serializer.attribute(null, "speed", "" + _loc.getSpeed());
+                            }catch(Exception e){
+                                serializer.attribute(null, "lat", "-1");
+                                serializer.attribute(null, "lon", "-1");
+                                serializer.attribute(null, "acc", "-1");
+                                serializer.attribute(null, "speed", "-1");
+                            }
                             serializer.attribute(null, "img_w", "" + _img_width);
                             serializer.attribute(null, "img_h", "" + _img_height);
-                            serializer.attribute(null, "speed", "" + _loc.getSpeed());
+
                             serializer.attribute(null, "ts_cam", "" + last_pic_ts);
                             if (_fix_exp) {
                                 serializer.attribute(null, "exp_time", "" + _exp_time);
@@ -531,7 +544,8 @@ public class MainActivity extends Activity {
         // http://stackoverflow.com/questions/29265126/android-camera2-capture-burst-is-too-slow
         // FIXME: expose to settings?
         captureBuilder.set(CaptureRequest.CONTROL_AWB_LOCK,true);
-        captureBuilder.set(CaptureRequest.CONTROL_AWB_MODE, CaptureRequest.CONTROL_AWB_MODE_OFF);
+        //captureBuilder.set(CaptureRequest.CONTROL_AWB_MODE, CaptureRequest.CONTROL_AWB_MODE_OFF);
+        captureBuilder.set(CaptureRequest.CONTROL_AWB_MODE, CaptureRequest.CONTROL_AWB_MODE_AUTO);
 
         captureBuilder.set(CaptureRequest.EDGE_MODE,CaptureRequest.EDGE_MODE_OFF);
         captureBuilder.set(CaptureRequest.COLOR_CORRECTION_ABERRATION_MODE, CaptureRequest.COLOR_CORRECTION_ABERRATION_MODE_OFF);

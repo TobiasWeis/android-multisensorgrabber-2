@@ -15,8 +15,6 @@
         android:summary=""
             />
 
-
-
     <ListPreference
         android:key="pref_resolutions"
         android:title="Resolution"
@@ -67,5 +65,11 @@
         android:entries="@array/settings_fr_entries"
         android:entryValues="@array/settings_fr_values"
         android:defaultValue="@string/settings_fr_default_value" />
+
+    <Preference
+        android:key="probe"
+        android:title="Probe Camera2 Features">
+        <intent android:action="ProbeView"/>
+    </Preference>
 
 </PreferenceScreen>

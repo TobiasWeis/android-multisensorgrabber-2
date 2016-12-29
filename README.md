@@ -9,6 +9,8 @@ App that is able to grab videos (in form of image-frames) that are annotated wit
 
 to **create low-cost, mobile sequence capturing devices**.
 
+Playstore: https://play.google.com/store/apps/details?id=de.weis.multisensor_grabber
+
 ![Multi-Sensor Grabber](app_screenshot.png "Multi-Sensor Grabber")
 
 ## Currently implemented
