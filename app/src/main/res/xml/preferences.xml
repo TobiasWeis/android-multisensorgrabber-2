@@ -3,8 +3,19 @@
     <Preference
         android:key="about"
         android:title="About">
-        <intent android:action="com.example.weis.AboutActivity"/>
+        <intent android:action="AboutView"/>
     </Preference>
+
+    <Preference
+        android:key="pref_dir"
+        android:title="Open Target directory"
+        android:dialogTitle="Target directory"
+        android:enabled="true"
+        android:defaultValue=""
+        android:summary=""
+            />
+
+
 
     <ListPreference
         android:key="pref_resolutions"

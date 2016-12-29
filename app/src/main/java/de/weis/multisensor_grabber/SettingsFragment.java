@@ -1,12 +1,14 @@
 package de.weis.multisensor_grabber;
 
 import android.content.Context;
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.ImageFormat;
 import android.hardware.Camera;
 import android.hardware.camera2.CameraAccessException;
 import android.hardware.camera2.CameraCharacteristics;
 import android.hardware.camera2.CameraManager;
+import android.net.Uri;
 import android.os.Bundle;
 import android.preference.CheckBoxPreference;
 import android.preference.EditTextPreference;
@@ -46,6 +48,21 @@ public class SettingsFragment extends PreferenceFragment implements SharedPrefer
 
         // initial summary setting
         findPreference("pref_focus_dist").setSummary(prefs.getString("pref_focus_dist", ""));
+        findPreference("pref_dir").setSummary(prefs.getString("pref_dir", ""));
+
+        findPreference("pref_dir").setOnPreferenceClickListener(new Preference.OnPreferenceClickListener() {
+            @Override
+            public boolean onPreferenceClick(Preference preference) {
+                Intent intent = new Intent(Intent.ACTION_VIEW);
+                Uri selected = Uri.parse(prefs.getString("pref_dir", ""));
+                intent.setDataAndType(selected, "resource/folder");
+
+                if (intent.resolveActivityInfo(getActivity().getPackageManager(), 0) != null){
+                    startActivity(intent);
+                } else {}
+                return true;
+            }
+        });
 
         manager = (CameraManager) getContext().getSystemService(Context.CAMERA_SERVICE);
         String cameraId = null;

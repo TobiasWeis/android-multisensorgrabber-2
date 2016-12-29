@@ -99,6 +99,7 @@ public class MainActivity extends Activity {
     private Handler mBackgroundHandler;
     private HandlerThread mBackgroundThread;
     File _dir;
+    File _extdir;
     FileOutputStream fileos;
     XmlSerializer serializer = Xml.newSerializer();
 
@@ -147,7 +148,7 @@ public class MainActivity extends Activity {
             try {
                 textview_coords.setText("Coordinates: " + String.format("%.03f", _loc.getLatitude()) + ", " + String.format("%.03f", _loc.getLongitude()) + ", Acc:" + _loc.getAccuracy());
             }catch(Exception e){
-                Log.e("GPS", "---------------- NO GPS DATA");
+                //Log.e("GPS", "---------------- NO GPS DATA");
             };
             textview_imu.setText("head: " + String.format("%.01f", _gyro_head) +
                     " pitch: " + String.format("%.01f", _gyro_pitch) +
@@ -228,8 +229,18 @@ public class MainActivity extends Activity {
                 }
         );
 
-
         manager = (CameraManager) getSystemService(Context.CAMERA_SERVICE);
+
+        try {
+            _extdir = getExternalFilesDirs(null)[1];
+        } catch (Exception e) {
+            _extdir = getExternalFilesDirs(null)[0];
+        }
+
+        /* put it in the prefs so the user can find the files later */
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(MainActivity.this);
+        prefs.edit().putString("pref_dir", _extdir.toString()).apply();
+
     }
 
     TextureView.SurfaceTextureListener textureListener = new TextureView.SurfaceTextureListener() {
@@ -257,7 +268,7 @@ public class MainActivity extends Activity {
     private final CameraDevice.StateCallback stateCallback = new CameraDevice.StateCallback() {
         @Override
         public void onOpened(CameraDevice camera) {
-            Log.e(TAG, "onOpened");
+            //Log.e(TAG, "onOpened");
             cameraDevice = camera;
             try {
                 characteristics = manager.getCameraCharacteristics(cameraDevice.getId());
@@ -338,17 +349,13 @@ public class MainActivity extends Activity {
 
     protected void takePicture() {
         if (null == cameraDevice) {
-            Log.e(TAG, "cameraDevice is null");
+            //Log.e(TAG, "cameraDevice is null");
             return;
         }
 
         _seq_timestamp = System.currentTimeMillis();
         // this is SD-storage, android/data/de.weis.multisensor_grabber/files/
-        try {
-            _dir = new File(getExternalFilesDirs(null)[1], "" + _seq_timestamp);
-        } catch (Exception e) {
-            _dir = new File(getExternalFilesDirs(null)[0], "" + _seq_timestamp);
-        }
+        _dir = new File(_extdir + File.separator + _seq_timestamp);
         _dir.mkdirs();
 
         try {
@@ -397,9 +404,9 @@ public class MainActivity extends Activity {
                             return;
                         }
 
-                        Log.d("_diff", "-------------------------------- " + (System.currentTimeMillis() - last_pic_ts));
+                        //Log.d("_diff", "-------------------------------- " + (System.currentTimeMillis() - last_pic_ts));
                         if ((System.currentTimeMillis() - last_pic_ts) >= 1000. / _fps) {
-                            Log.d("1000/fps", "--------------------------------================================== " + 1000. / _fps);
+                            //Log.d("1000/fps", "--------------------------------================================== " + 1000. / _fps);
                             _diff = System.currentTimeMillis() - last_pic_ts;
                             last_pic_ts = System.currentTimeMillis();
 
@@ -541,7 +548,7 @@ public class MainActivity extends Activity {
             Float foc_dist = Float.parseFloat(prefs.getString("pref_focus_dist", "0"));
             captureBuilder.set(CaptureRequest.LENS_FOCUS_DISTANCE, foc_dist);
             captureBuilder.set(CaptureRequest.CONTROL_AF_MODE, CONTROL_AF_MODE_OFF);
-            Log.d("Focus", "------------------------------- set focus dist to: " + foc_dist);
+            //Log.d("Focus", "------------------------------- set focus dist to: " + foc_dist);
         }
 
         if(_fix_exp){
@@ -567,7 +574,7 @@ public class MainActivity extends Activity {
 
             texture.setDefaultBufferSize(_img_width, _img_height);
 
-            Log.d("textureView", "========================= calling configureTransform");
+            //Log.d("textureView", "========================= calling configureTransform");
             configureTransform(textureView.getWidth(),textureView.getHeight());
 
             // for the preview, we only want the preview-surface as output
@@ -598,7 +605,7 @@ public class MainActivity extends Activity {
         }
     }
     private void openCamera() {
-        Log.e(TAG, "is camera open");
+        //Log.e(TAG, "is camera open");
         try {
             cameraId = manager.getCameraIdList()[0];
             CameraCharacteristics characteristics = manager.getCameraCharacteristics(cameraId);
@@ -632,12 +639,12 @@ public class MainActivity extends Activity {
         } catch (CameraAccessException e) {
             e.printStackTrace();
         }
-        Log.e(TAG, "openCamera X");
+        //Log.e(TAG, "openCamera X");
     }
 
     protected void updatePreview() {
         if(null == cameraDevice) {
-            Log.e(TAG, "updatePreview error, return");
+            //Log.e(TAG, "updatePreview error, return");
         }
 
         try {
@@ -649,14 +656,14 @@ public class MainActivity extends Activity {
 
     private void configureTransform(int viewWidth, int viewHeight) {
         if (null == textureView){
-            Log.d("configTrans", "------------------------------textureView is null!");
+            //Log.d("configTrans", "------------------------------textureView is null!");
             return;
         }
 
         int rotation = getWindowManager().getDefaultDisplay().getRotation();
         Matrix matrix = new Matrix();
         RectF viewRect = new RectF(0, 0, viewWidth, viewHeight);
-        Log.d("imageDim", "=============================== height: " + _img_height + ", width: " + _img_width);
+        //Log.d("imageDim", "=============================== height: " + _img_height + ", width: " + _img_width);
         RectF bufferRect = new RectF(0, 0, _img_height, _img_width);
         float centerX = viewRect.centerX();
         float centerY = viewRect.centerY();
@@ -706,7 +713,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
-        Log.e(TAG, "onResume");
+        //Log.e(TAG, "onResume");
         startBackgroundThread();
 
         if (textureView.isAvailable()) {
@@ -717,7 +724,7 @@ public class MainActivity extends Activity {
     }
     @Override
     protected void onPause() {
-        Log.e(TAG, "onPause");
+        //Log.e(TAG, "onPause");
         _recording = false;
         takePictureButton.setImageResource(R.mipmap.icon_rec);
         closeCamera();
