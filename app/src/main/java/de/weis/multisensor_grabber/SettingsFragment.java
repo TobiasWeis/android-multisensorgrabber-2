@@ -8,6 +8,8 @@ import android.hardware.Camera;
 import android.hardware.camera2.CameraAccessException;
 import android.hardware.camera2.CameraCharacteristics;
 import android.hardware.camera2.CameraManager;
+import android.hardware.camera2.CameraMetadata;
+import android.hardware.camera2.CaptureRequest;
 import android.net.Uri;
 import android.os.Bundle;
 import android.preference.CheckBoxPreference;
@@ -17,13 +19,25 @@ import android.preference.Preference;
 import android.preference.PreferenceFragment;
 import android.preference.PreferenceManager;
 import android.util.Log;
+import android.util.Range;
 import android.util.Size;
 
 import java.util.ArrayList;
 import java.util.List;
 
 import static android.hardware.camera2.CameraCharacteristics.CONTROL_AE_AVAILABLE_MODES;
+import static android.hardware.camera2.CameraCharacteristics.CONTROL_AWB_AVAILABLE_MODES;
 import static android.hardware.camera2.CameraMetadata.CONTROL_AE_MODE_OFF;
+import static android.hardware.camera2.CameraMetadata.CONTROL_AWB_MODE_AUTO;
+import static android.hardware.camera2.CameraMetadata.CONTROL_AWB_MODE_CLOUDY_DAYLIGHT;
+import static android.hardware.camera2.CameraMetadata.CONTROL_AWB_MODE_DAYLIGHT;
+import static android.hardware.camera2.CameraMetadata.CONTROL_AWB_MODE_FLUORESCENT;
+import static android.hardware.camera2.CameraMetadata.CONTROL_AWB_MODE_INCANDESCENT;
+import static android.hardware.camera2.CameraMetadata.CONTROL_AWB_MODE_OFF;
+import static android.hardware.camera2.CameraMetadata.CONTROL_AWB_MODE_SHADE;
+import static android.hardware.camera2.CameraMetadata.CONTROL_AWB_MODE_TWILIGHT;
+import static android.hardware.camera2.CameraMetadata.CONTROL_AWB_MODE_WARM_FLUORESCENT;
+import static android.hardware.camera2.CameraMetadata.REQUEST_AVAILABLE_CAPABILITIES_MANUAL_SENSOR;
 
 /**
  * Created by weis on 27.12.16.
@@ -43,12 +57,7 @@ public class SettingsFragment extends PreferenceFragment implements SharedPrefer
 
         getPreferenceScreen().getSharedPreferences().registerOnSharedPreferenceChangeListener(this);
 
-
         prefs = PreferenceManager.getDefaultSharedPreferences(getActivity());
-
-        // initial summary setting
-        findPreference("pref_focus_dist").setSummary(prefs.getString("pref_focus_dist", ""));
-        findPreference("pref_dir").setSummary(prefs.getString("pref_dir", ""));
 
         findPreference("pref_dir").setOnPreferenceClickListener(new Preference.OnPreferenceClickListener() {
             @Override
@@ -79,11 +88,9 @@ public class SettingsFragment extends PreferenceFragment implements SharedPrefer
         }
 
         final CheckBoxPreference pref_fix_exp = (CheckBoxPreference) findPreference("pref_fix_exp");
-
         pref_fix_exp.setOnPreferenceChangeListener(new Preference.OnPreferenceChangeListener() {
             @Override
             public boolean onPreferenceChange(Preference preference, Object newValue) {
-                //newValue.equals(true);
                 populate_exposure_list(newValue);
                 return true;
             }
@@ -98,14 +105,34 @@ public class SettingsFragment extends PreferenceFragment implements SharedPrefer
             }
         });
 
+        final CheckBoxPreference pref_fix_iso = (CheckBoxPreference) findPreference("pref_fix_iso");
+        pref_fix_foc.setOnPreferenceChangeListener(new Preference.OnPreferenceChangeListener() {
+            @Override
+            public boolean onPreferenceChange(Preference preference, Object newValue) {
+                populate_iso_list(newValue);
+                return true;
+            }
+        });
+
+
         populate_focus_dist(null);
         populate_exposure_list(null);
         populate_resolution_list();
+        populate_whitebalance_list();
+        populate_iso_list(null);
+
+        // initial summary setting
+        /*
+        findPreference("pref_focus_dist").setSummary(prefs.getString("pref_focus_dist", ""));
+        findPreference("pref_dir").setSummary(prefs.getString("pref_dir", ""));
+        findPreference("pref_wb").setSummary(wb2string(Integer.parseInt(prefs.getString("pref_wb", "-1"))));
+        findPreference("pref_iso").setSummary(Integer.parseInt(prefs.getString("pref_iso", "-1")));
+        */
     }
 
     public void populate_focus_dist(Object val){
         CheckBoxPreference pref_fix_foc = (CheckBoxPreference) findPreference("pref_fix_foc");
-        final Preference fp = (Preference) findPreference("pref_focus_dist");
+        final Preference fp = findPreference("pref_focus_dist");
 
         boolean isChecked;
 
@@ -122,10 +149,108 @@ public class SettingsFragment extends PreferenceFragment implements SharedPrefer
         }
     }
 
-    public void populate_exposure_list(Object val){
+    public void populate_iso_list(Object val){
+        final ListPreference lp = (ListPreference) findPreference("pref_iso");
 
+        CheckBoxPreference pref_fix_iso = (CheckBoxPreference) findPreference("pref_fix_iso");
+
+        boolean isChecked;
+
+        if(val == null){
+            isChecked = pref_fix_iso.isChecked();
+        }else{
+            isChecked = val.equals(true);
+        }
+
+        int max1;
+        int min1;
+
+        try {
+            //FIXME: find a way to check if manual_sensor is in capabilities instead of catching this
+            Range<Integer> range2 = characteristics.get(CameraCharacteristics.SENSOR_INFO_SENSITIVITY_RANGE);
+            max1 = range2.getUpper();//10000
+            min1 = range2.getLower();//100
+        } catch (Exception e) {
+            pref_fix_iso.setEnabled(false);
+            lp.setSummary("Not available on device");
+            lp.setEnabled(false);
+            lp.setDefaultValue("-1");
+            return;
+        }
+        // List dialog to select resolution
+        List<String> itemslist = new ArrayList<String>();
+        List<String> valueslist = new ArrayList<String>();
+
+        int i = min1;
+        while (true) {
+            itemslist.add("" + i);
+            valueslist.add("" + i);
+            i += 50;
+            if (i >= max1) break;
+        }
+
+        final CharSequence[] entries = itemslist.toArray(new CharSequence[itemslist.size()]);
+        final CharSequence[] values = valueslist.toArray(new CharSequence[valueslist.size()]);
+
+        lp.setEnabled(true);
+        lp.setEntries(entries);
+        lp.setDefaultValue("" + min1);
+        lp.setEntryValues(values);
+    }
+
+    // FIXME: double use in MainActivity
+    public String wb2string(int wb){
+        if(wb == CONTROL_AWB_MODE_CLOUDY_DAYLIGHT) return "Cloudy daylight";
+        if(wb == CONTROL_AWB_MODE_DAYLIGHT) return "Daylight";
+        if(wb == CONTROL_AWB_MODE_FLUORESCENT) return "Fluorescent";
+        if(wb == CONTROL_AWB_MODE_INCANDESCENT) return "Incandescent";
+        if(wb == CONTROL_AWB_MODE_SHADE) return "Shade";
+        if(wb == CONTROL_AWB_MODE_TWILIGHT) return "Twilight";
+        if(wb == CONTROL_AWB_MODE_WARM_FLUORESCENT) return "Warm Fluorescent";
+        if(wb == CONTROL_AWB_MODE_OFF) return "Off";
+        if(wb == CONTROL_AWB_MODE_AUTO) return "Auto";
+        if(wb == -1) return "Not available";
+        return "N/A: "+wb;
+    }
+
+    public void populate_whitebalance_list(){
+        int[] tmp =  characteristics.get(CONTROL_AWB_AVAILABLE_MODES);
+
+        // List dialog to select resolution
+        List<String> itemslist = new ArrayList<String>();
+        List<String> valueslist = new ArrayList<String>();
+
+        for (int wbval : tmp) {
+            itemslist.add(wb2string(wbval));
+            valueslist.add("" + wbval);
+        }
+        final CharSequence[] entries = itemslist.toArray(new CharSequence[itemslist.size()]);
+        final CharSequence[] values = valueslist.toArray(new CharSequence[valueslist.size()]);
+
+        final ListPreference lp = (ListPreference) findPreference("pref_wb");
+        lp.setEntries(entries);
+        lp.setDefaultValue(""+CONTROL_AWB_MODE_AUTO);
+        lp.setEntryValues(values);
+    }
+
+    public void populate_exposure_list(Object val){
         CheckBoxPreference pref_fix_exp = (CheckBoxPreference) findPreference("pref_fix_exp");
         final Preference ep = (Preference) findPreference("pref_exposure");
+
+        boolean ae_off_supported = false;
+        for (Integer mykey : characteristics.get(CONTROL_AE_AVAILABLE_MODES)) {
+            if (mykey == CONTROL_AE_MODE_OFF) {
+                ae_off_supported = true;
+            }
+        }
+
+        if(!ae_off_supported){
+            pref_fix_exp.setChecked(false);
+            pref_fix_exp.setEnabled(false);
+            ep.setEnabled(false);
+            ep.setSummary("Not supported by device");
+            return;
+        }
 
         boolean isChecked;
 
@@ -135,22 +260,9 @@ public class SettingsFragment extends PreferenceFragment implements SharedPrefer
             isChecked = val.equals(true);
         }
         if (isChecked) {
-            boolean ae_off_supported = false;
-            for (Integer mykey : characteristics.get(CONTROL_AE_AVAILABLE_MODES)) {
-                if (mykey == CONTROL_AE_MODE_OFF) {
-                    ae_off_supported = true;
-                }
-            }
-
-            if (ae_off_supported) {
-                ep.setEnabled(true);
-                ep.setSummary("Enabled");
-                // set default value of exposure time
-                findPreference("pref_exposure").setSummary(prefs.getString("pref_exposure", ""));
-            } else {
-                ep.setEnabled(false);
-                ep.setSummary("Not supported by device");
-            }
+            ep.setEnabled(true);
+            ep.setSummary("Enabled");
+            findPreference("pref_exposure").setSummary(prefs.getString("pref_exposure", ""));
         }else {
             ep.setEnabled(false);
             ep.setSummary("Fixed exposure not enabled");

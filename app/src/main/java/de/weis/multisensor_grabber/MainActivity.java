@@ -70,6 +70,15 @@ import static android.hardware.camera2.CameraCharacteristics.CONTROL_AE_AVAILABL
 import static android.hardware.camera2.CameraMetadata.CONTROL_AE_MODE_OFF;
 import static android.hardware.camera2.CameraMetadata.CONTROL_AE_MODE_ON;
 import static android.hardware.camera2.CameraMetadata.CONTROL_AF_MODE_OFF;
+import static android.hardware.camera2.CameraMetadata.CONTROL_AWB_MODE_AUTO;
+import static android.hardware.camera2.CameraMetadata.CONTROL_AWB_MODE_CLOUDY_DAYLIGHT;
+import static android.hardware.camera2.CameraMetadata.CONTROL_AWB_MODE_DAYLIGHT;
+import static android.hardware.camera2.CameraMetadata.CONTROL_AWB_MODE_FLUORESCENT;
+import static android.hardware.camera2.CameraMetadata.CONTROL_AWB_MODE_INCANDESCENT;
+import static android.hardware.camera2.CameraMetadata.CONTROL_AWB_MODE_OFF;
+import static android.hardware.camera2.CameraMetadata.CONTROL_AWB_MODE_SHADE;
+import static android.hardware.camera2.CameraMetadata.CONTROL_AWB_MODE_TWILIGHT;
+import static android.hardware.camera2.CameraMetadata.CONTROL_AWB_MODE_WARM_FLUORESCENT;
 import static android.hardware.camera2.CaptureResult.CONTROL_AE_MODE;
 import static android.hardware.camera2.CaptureResult.SENSOR_EXPOSURE_TIME;
 
@@ -116,7 +125,12 @@ public class MainActivity extends Activity {
     Integer _img_width = 640;
     Integer _img_height = 480;
     boolean _fix_exp;
+    boolean _fix_foc;
+    boolean _fix_iso;
+    Float _foc_dist;
     Long _exp_time;
+    int _wb_value;
+    int _iso_value;
     Float _fps;
     Long _diff = new Long(0);
 
@@ -139,6 +153,7 @@ public class MainActivity extends Activity {
     TextView textview_coords;
     TextView textview_fps;
     TextView textview_imu;
+    TextView textview_camera;
 
     private Runnable grab_system_data = new Runnable() {
         @Override
@@ -162,9 +177,56 @@ public class MainActivity extends Activity {
                     " az " + String.format("%.01f", _accel_z));
             textview_fps.setText(String.format("%.1f", 1000. / _diff) + " f/s");
 
+            /*
+            _fix_exp=prefs.getBoolean("pref_fix_exp",false);
+            _exp_time=Long.parseLong(prefs.getString("pref_exposure","0")) * 1000000;
+            _fix_foc = prefs.getBoolean("pref_fix_foc", false);
+            _wb_value = Integer.parseInt(prefs.getString("pref_wb", ""+CONTROL_AWB_MODE_AUTO));
+            _iso_value = Integer.parseInt(prefs.getString("pref_iso", "-1"));
+            */
+            String camstring = "EXP: ";
+            if(_fix_exp){
+                camstring += "Fixed: " + _exp_time/1000000 + "ms";
+            }else{
+                camstring += "Auto";
+            }
+
+            camstring += ", FOC: ";
+            if(_fix_foc){
+                camstring += "Fixed: " + _foc_dist;
+            }else{
+                camstring += "Auto";
+            }
+
+            camstring += ", ISO: ";
+            if(_fix_iso){
+                camstring += ""+_iso_value;
+            }else{
+                camstring += "Auto";
+            }
+
+            camstring += ", WB: "+ wb2string(_wb_value);
+
+            textview_camera.setText(camstring);
+
             sys_handler.postDelayed(grab_system_data, 500);
         }
     };
+
+    // FIXME: double use in SettingsFragment.java
+    public String wb2string(int wb){
+        if(wb == CONTROL_AWB_MODE_CLOUDY_DAYLIGHT) return "Cloudy daylight";
+        if(wb == CONTROL_AWB_MODE_DAYLIGHT) return "Daylight";
+        if(wb == CONTROL_AWB_MODE_FLUORESCENT) return "Fluorescent";
+        if(wb == CONTROL_AWB_MODE_INCANDESCENT) return "Incandescent";
+        if(wb == CONTROL_AWB_MODE_SHADE) return "Shade";
+        if(wb == CONTROL_AWB_MODE_TWILIGHT) return "Twilight";
+        if(wb == CONTROL_AWB_MODE_WARM_FLUORESCENT) return "Warm Fluorescent";
+        if(wb == CONTROL_AWB_MODE_OFF) return "Off";
+        if(wb == CONTROL_AWB_MODE_AUTO) return "Auto";
+        if(wb == -1) return "Not available";
+        return "N/A: "+wb;
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -175,6 +237,7 @@ public class MainActivity extends Activity {
         textview_coords = (TextView) findViewById(R.id.textview_coords);
         textview_imu = (TextView) findViewById(R.id.textview_imu);
         textview_fps = (TextView) findViewById(R.id.textview_fps);
+        textview_camera = (TextView) findViewById(R.id.textview_camera);
 
         textureView = (TextureView) findViewById(R.id.texture);
         assert textureView != null;
@@ -290,6 +353,7 @@ public class MainActivity extends Activity {
                 // ------------ resolution and setup reader and output surfaces
                 String selected_res = prefs.getString("pref_resolutions", ""); // this gives the value
                 if (selected_res != "") {
+                    // FIXME: expose to preferences!
                     //Size[] sizes = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP).getOutputSizes(ImageFormat.YUV_420_888);
                     // FIXME: max framerate with JPEG is 150ms == ca. 6.6 fps on GS5
                     // GS6: 36-40ms
@@ -332,6 +396,8 @@ public class MainActivity extends Activity {
             super.onCaptureCompleted(session, request, result);
             _diff = System.currentTimeMillis() - last_pic_ts;
             last_pic_ts = System.currentTimeMillis();
+            //Log.d("EXP-TIME:", ""+result.get(CaptureResult.SENSOR_EXPOSURE_TIME));
+            //Log.d("EXP-TIME:", ""+result.get(CaptureResult.SENSOR_SENSITIVITY));
         }
     };
 
@@ -456,6 +522,13 @@ public class MainActivity extends Activity {
                             serializer.attribute(null, "img_w", "" + _img_width);
                             serializer.attribute(null, "img_h", "" + _img_height);
 
+                            serializer.attribute(null, "wb_value", ""+ _wb_value);
+                            if(_fix_iso) {
+                                serializer.attribute(null, "iso_value", "" + _iso_value);
+                            }else {
+                                serializer.attribute(null, "iso_value", "-1");
+                            }
+
                             serializer.attribute(null, "ts_cam", "" + last_pic_ts);
                             if (_fix_exp) {
                                 serializer.attribute(null, "exp_time", "" + _exp_time);
@@ -464,6 +537,11 @@ public class MainActivity extends Activity {
                                 serializer.attribute(null, "exp_time", "-1");
                             }
 
+                            if(_fix_foc) {
+                                serializer.attribute(null, "foc_dist", "" + _foc_dist);
+                            }else {
+                                serializer.attribute(null, "foc_dist", "-1");
+                            }
                             serializer.attribute(null, "avelx", ""+_gyro_roll);
                             serializer.attribute(null, "avely", ""+_gyro_head);
                             serializer.attribute(null, "avelz", ""+_gyro_pitch);
@@ -472,7 +550,7 @@ public class MainActivity extends Activity {
                             serializer.attribute(null, "accz", ""+_accel_z);
 
                             serializer.endTag(null, "Frame");
-                            serializer.flush();
+                            //serializer.flush(); // FIXME: a flush at the end should be enough!
 
                         } catch (IOException e) {
                             Toast.makeText(MainActivity.this, "Serializer IOExcept: " + e, Toast.LENGTH_LONG);
@@ -494,13 +572,13 @@ public class MainActivity extends Activity {
                 public void onCaptureCompleted(CameraCaptureSession session, CaptureRequest request, TotalCaptureResult result) {
                     super.onCaptureCompleted(session, request, result);
                     // does not work on GS5
+                    // FIXME: these infos can be used on supporting phones if they are in auto mode
                     /*
                     Log.e(TAG, "Available keys = " + result.getKeys().toString());
                     Log.e(TAG, "Exposure time = " + result.get(CaptureResult.SENSOR_EXPOSURE_TIME));
 			        Log.e(TAG, "Frame duration = " + result.get(CaptureResult.SENSOR_FRAME_DURATION));
                     Log.e(TAG, "Sensor sensitivity = " + result.get(CaptureResult.SENSOR_SENSITIVITY));
                     */
-                    //Toast.makeText(getApplicationContext(), "Saved:" + _cnt, Toast.LENGTH_SHORT).show();
                 }
             };
 
@@ -511,6 +589,7 @@ public class MainActivity extends Activity {
                         _session = session;
                         // use the same captureRequest builder as for the preview,
                         // this has already been built from user preferences!
+
                         session.setRepeatingRequest(_capReq.build(), captureListener, mBackgroundHandler);
                         //session.capture(captureBuilder.build(), captureListener, mBackgroundHandler);
                     } catch (CameraAccessException e) {
@@ -541,38 +620,55 @@ public class MainActivity extends Activity {
 
         captureBuilder.set(CaptureRequest.CONTROL_MODE,CameraMetadata.CONTROL_MODE_AUTO);
 
-        // http://stackoverflow.com/questions/29265126/android-camera2-capture-burst-is-too-slow
-        // FIXME: expose to settings?
-        captureBuilder.set(CaptureRequest.CONTROL_AWB_LOCK,true);
-        //captureBuilder.set(CaptureRequest.CONTROL_AWB_MODE, CaptureRequest.CONTROL_AWB_MODE_OFF);
-        captureBuilder.set(CaptureRequest.CONTROL_AWB_MODE, CaptureRequest.CONTROL_AWB_MODE_AUTO);
-
-        captureBuilder.set(CaptureRequest.EDGE_MODE,CaptureRequest.EDGE_MODE_OFF);
-        captureBuilder.set(CaptureRequest.COLOR_CORRECTION_ABERRATION_MODE, CaptureRequest.COLOR_CORRECTION_ABERRATION_MODE_OFF);
-        captureBuilder.set(CaptureRequest.NOISE_REDUCTION_MODE, CaptureRequest.NOISE_REDUCTION_MODE_OFF);
-        captureBuilder.set(CaptureRequest.CONTROL_AF_TRIGGER, CaptureRequest.CONTROL_AF_TRIGGER_CANCEL);
-
         /* user prefs */
         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(MainActivity.this);
         _fix_exp=prefs.getBoolean("pref_fix_exp",false);
         _exp_time=Long.parseLong(prefs.getString("pref_exposure","0")) * 1000000;
-        boolean fix_foc = prefs.getBoolean("pref_fix_foc", false);
+        _fix_foc = prefs.getBoolean("pref_fix_foc", false);
+        _fix_iso = prefs.getBoolean("pref_fix_iso", false);
 
-        if(fix_foc) {
-            Float foc_dist = Float.parseFloat(prefs.getString("pref_focus_dist", "0"));
-            captureBuilder.set(CaptureRequest.LENS_FOCUS_DISTANCE, foc_dist);
-            captureBuilder.set(CaptureRequest.CONTROL_AF_MODE, CONTROL_AF_MODE_OFF);
-            //Log.d("Focus", "------------------------------- set focus dist to: " + foc_dist);
-        }
+        _foc_dist = Float.parseFloat(prefs.getString("pref_focus_dist", "-1"));
+        _wb_value = Integer.parseInt(prefs.getString("pref_wb", ""+CONTROL_AWB_MODE_AUTO));
+        _iso_value = Integer.parseInt(prefs.getString("pref_iso", "-1"));
 
+        /************************************** EXPOSURE TIME ********************************/
         if(_fix_exp){
             captureBuilder.set(CaptureRequest.CONTROL_AE_MODE, CONTROL_AE_MODE_OFF);
+            captureBuilder.set(CaptureRequest.SENSOR_EXPOSURE_TIME, _exp_time);
             captureBuilder.set(CaptureRequest.CONTROL_AE_LOCK, true);
         }
 
-        if(_exp_time!=0){
-            captureBuilder.set(CaptureRequest.SENSOR_EXPOSURE_TIME, _exp_time);
+        /************************************** ISO ********************************/
+        if(_fix_iso) {
+            if (_iso_value != -1) {
+                captureBuilder.set(CaptureRequest.SENSOR_SENSITIVITY, _iso_value);
+            }
         }
+
+
+        /************************************** FOCUS ********************************/
+        if(_fix_foc) {
+            captureBuilder.set(CaptureRequest.LENS_FOCUS_DISTANCE, _foc_dist);
+            captureBuilder.set(CaptureRequest.CONTROL_AF_MODE, CONTROL_AF_MODE_OFF);
+        }
+
+        /************************************** WHITEBALANCE ********************************/
+        https://developer.android.com/reference/android/hardware/camera2/CaptureRequest.html
+        // When set to the OFF mode, the camera device's auto-white balance routine is disabled.
+        // The application manually controls the white balance by
+        // android.colorCorrection.transform, (https://developer.android.com/reference/android/hardware/camera2/CaptureRequest.html#COLOR_CORRECTION_TRANSFORM)
+        // android.colorCorrection.gains (https://developer.android.com/reference/android/hardware/camera2/CaptureRequest.html#COLOR_CORRECTION_GAINS)
+        // android.colorCorrection.mode. (https://developer.android.com/reference/android/hardware/camera2/CaptureRequest.html#COLOR_CORRECTION_MODE)
+        // FIXME: implement setting the manual stuff for OFF-Mode
+        captureBuilder.set(CaptureRequest.CONTROL_AWB_MODE, _wb_value);
+        //captureBuilder.set(CaptureRequest.CONTROL_AWB_LOCK,true);
+
+        /************************************** REST ********************************/
+        // http://stackoverflow.com/questions/29265126/android-camera2-capture-burst-is-too-slow
+        captureBuilder.set(CaptureRequest.EDGE_MODE,CaptureRequest.EDGE_MODE_OFF);
+        captureBuilder.set(CaptureRequest.COLOR_CORRECTION_ABERRATION_MODE, CaptureRequest.COLOR_CORRECTION_ABERRATION_MODE_OFF);
+        captureBuilder.set(CaptureRequest.NOISE_REDUCTION_MODE, CaptureRequest.NOISE_REDUCTION_MODE_OFF);
+        captureBuilder.set(CaptureRequest.CONTROL_AF_TRIGGER, CaptureRequest.CONTROL_AF_TRIGGER_CANCEL);
 
         // Orientation
         int rotation = getWindowManager().getDefaultDisplay().getRotation();
@@ -662,6 +758,7 @@ public class MainActivity extends Activity {
         }
 
         try {
+            // try to get 40 images single to let the auto-modes settle
             cameraCaptureSessions.setRepeatingRequest(_capReq.build(), previewCallbackListener, mBackgroundHandler);
         } catch (CameraAccessException e) {
             e.printStackTrace();

@@ -43,12 +43,19 @@
 
     <TextView
         android:id="@+id/textview_fps"
-        android:text=""
+        android:text="FPS"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_below="@id/textview_imu"
         android:textColor="#00ff00"/>
 
+    <TextView
+        android:id="@+id/textview_camera"
+        android:text="Camera:"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/textview_fps"
+        android:textColor="#00ff00"/>
 
     <ImageButton
         android:id="@+id/btn_takepicture"

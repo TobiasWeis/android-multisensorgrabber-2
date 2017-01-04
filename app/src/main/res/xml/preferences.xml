@@ -58,6 +58,27 @@
         />
 
     <ListPreference
+        android:key="pref_wb"
+        android:summary="%s"
+        android:title="Whitebalance value"
+        android:dialogTitle="Whitebalance"
+        android:entries="@array/settings_wb_entries"
+        android:entryValues="@array/settings_wb_values" />
+
+    <CheckBoxPreference
+        android:key="pref_fix_iso"
+        android:title="Fixed ISO"
+        android:defaultValue="false" />
+
+    <ListPreference
+        android:key="pref_iso"
+        android:summary="%s"
+        android:title="ISO value"
+        android:dialogTitle="ISO value"
+        android:entries="@array/settings_iso_entries"
+        android:entryValues="@array/settings_iso_values" />
+
+    <ListPreference
         android:key="pref_framerates"
         android:summary="%s"
         android:title="@string/settings_fr_title"
