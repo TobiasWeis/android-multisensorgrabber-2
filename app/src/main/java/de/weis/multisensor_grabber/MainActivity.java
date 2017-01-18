@@ -62,8 +62,11 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Date;
 import java.util.List;
 
 import static android.hardware.camera2.CameraCharacteristics.CONTROL_AE_AVAILABLE_MODES;
@@ -432,7 +435,13 @@ public class MainActivity extends Activity {
 
         _seq_timestamp = System.currentTimeMillis();
         // this is SD-storage, android/data/de.weis.multisensor_grabber/files/
-        _dir = new File(_extdir + File.separator + _seq_timestamp);
+        // TOBI
+        DateFormat sdf = new SimpleDateFormat("yyyy_MM_dd-HH_mm");
+        Date netDate = (new Date(_seq_timestamp));
+        Log.d("===== datestring", ""+sdf.format(netDate));
+
+        //_dir = new File(_extdir + File.separator + _seq_timestamp);
+        _dir = new File(_extdir + File.separator + sdf.format(netDate));
         _dir.mkdirs();
         _path = _dir.getPath() + File.separator;
 
