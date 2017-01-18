@@ -494,7 +494,7 @@ public class MainActivity extends Activity {
 
                             try{
                                 if(_format == "JPEG") {
-                                    fname = "pic" + _cnt + ".jpg";
+                                    fname = "pic" + String.format("%08d", _cnt) + ".jpg";
                                     File file = new File(_path + fname);
                                     FileOutputStream output = null;
                                     try {
@@ -508,9 +508,8 @@ public class MainActivity extends Activity {
                                     buffer.get(bytes);
                                     output.write(bytes);
                                     output.close();
-                                    //save_jpeg(bytes); //createRunnable(bytes).run(); // try to run in another thread...(does not seem to be faster)
                                 }else {
-                                    fname = "pic" + _cnt + ".yuv";
+                                    fname = "pic" + String.format("%08d", _cnt) + ".yuv";
                                     File file = new File(_path + fname);
                                     FileOutputStream output = new FileOutputStream(file);
                                     output = new FileOutputStream(file);
@@ -522,12 +521,6 @@ public class MainActivity extends Activity {
                                             .putInt(image.getHeight())
                                             .putInt(image.getPlanes()[1].getPixelStride())
                                             .putInt(image.getPlanes()[1].getRowStride());
-                                    /*
-                                    Log.d("--------width: ", ""+image.getWidth());
-                                    Log.d("--------height: ", ""+image.getHeight());
-                                    Log.d("--------rstride: ", ""+image.getPlanes()[1].getRowStride());
-                                    Log.d("--------pstride: ", ""+image.getPlanes()[1].getPixelStride());
-                                    */
 
                                     output.write(prebuffer.array()); // write meta information to file
                                     // Now write the actual planes.
@@ -551,22 +544,6 @@ public class MainActivity extends Activity {
                         }
                     image.close();
                 }
-
-                /*
-                private Runnable createRunnable(final byte[] bytes){
-                    Runnable aRunnable = new Runnable(){
-                        public void run(){
-                            try {
-                                save(bytes);
-                            } catch (IOException e) {
-                                e.printStackTrace();
-                            }
-                        }
-                    };
-
-                    return aRunnable;
-                }
-                */
 
                 private void save_xml(String fname) throws IOException {
                     //Long st = System.currentTimeMillis();
@@ -660,14 +637,7 @@ public class MainActivity extends Activity {
                         _session = session;
                         // use the same captureRequest builder as for the preview,
                         // this has already been built from user preferences!
-
                         session.setRepeatingRequest(_capReq.build(), captureListener, mBackgroundHandler);
-
-                        /*
-                        List capreqs = new ArrayList();
-                        capreqs.add(_capReq.build());
-                        session.setRepeatingBurst(capreqs, captureListener, mBackgroundHandler);
-                        */
                     } catch (CameraAccessException e) {
                         e.printStackTrace();
                     }

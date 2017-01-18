@@ -122,12 +122,10 @@ public class SettingsFragment extends PreferenceFragment implements SharedPrefer
         populate_iso_list(null);
 
         // initial summary setting
-        /*
-        findPreference("pref_focus_dist").setSummary(prefs.getString("pref_focus_dist", ""));
         findPreference("pref_dir").setSummary(prefs.getString("pref_dir", ""));
+        findPreference("pref_focus_dist").setSummary(prefs.getString("pref_focus_dist", ""));
         findPreference("pref_wb").setSummary(wb2string(Integer.parseInt(prefs.getString("pref_wb", "-1"))));
-        findPreference("pref_iso").setSummary(Integer.parseInt(prefs.getString("pref_iso", "-1")));
-        */
+        //findPreference("pref_iso").setSummary(Integer.parseInt(prefs.getString("pref_iso", "-1")));
     }
 
     public void populate_focus_dist(Object val){

@@ -26,7 +26,8 @@ public class AboutActivity extends Activity {
                         "<p>Developer: Tobias Weis (<a href=\"mailto:mail@tobias-weis.de\">mail@tobias-weis.de</a>), " +
                         "<a href=\"http://www.tobias-weis.de\">www.tobias-weis.de</a><br><br>" +
                         "<b>DISCLAIMER:</b><br>Some features (e.g. exposure-control) are not available on specific phones. This app is using the camera2 API<br><br>" +
-                        "This app has been written to grab geo-annotated sequences for computer-vision experiments." +
+                        "This app has been written to grab sequences annotated with GPS, accelerometer and gyroscope data for computer-vision experiments.<br><br>" +
+                        "Due to framerate requirements, the app will save images as YUV files which can be encoded into another format offline.<br><br>"+
                         "Feel free to modify the code and use it for your work (no paper or report yet to cite):<br>" +
                         "<a href=\"https://github.com/TobiasWeis/android-multisensorgrabber-2\">https://github.com/TobiasWeis/android-multisensorgrabber-2</a></p>")
         );
