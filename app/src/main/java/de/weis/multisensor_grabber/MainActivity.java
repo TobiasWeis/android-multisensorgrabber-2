@@ -108,6 +108,7 @@ public class MainActivity extends Activity {
     private Handler mBackgroundHandler;
     private HandlerThread mBackgroundThread;
     File _dir;
+    String _path;
     File _extdir;
     FileOutputStream fileos;
     XmlSerializer serializer = Xml.newSerializer();
@@ -119,6 +120,7 @@ public class MainActivity extends Activity {
     CaptureRequest.Builder _capReq; // needs to be global b/c preview-setup
 
     Long last_pic_ts = new Long(0);
+    Long last_pic_rec = new Long(0);
 
     protected Integer _cnt = 0;
     protected Boolean _recording = false;
@@ -154,6 +156,9 @@ public class MainActivity extends Activity {
     TextView textview_fps;
     TextView textview_imu;
     TextView textview_camera;
+
+    // FIXME: expose to settings
+    String _format = "YUV";
 
     private Runnable grab_system_data = new Runnable() {
         @Override
@@ -299,16 +304,6 @@ public class MainActivity extends Activity {
 
         manager = (CameraManager) getSystemService(Context.CAMERA_SERVICE);
 
-        try {
-            _extdir = getExternalFilesDirs(null)[1];
-        } catch (Exception e) {
-            _extdir = getExternalFilesDirs(null)[0];
-        }
-
-        /* put it in the prefs so the user can find the files later */
-        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(MainActivity.this);
-        prefs.edit().putString("pref_dir", _extdir.toString()).apply();
-
     }
 
     TextureView.SurfaceTextureListener textureListener = new TextureView.SurfaceTextureListener() {
@@ -343,35 +338,49 @@ public class MainActivity extends Activity {
 
                 // read preferences
                 SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(MainActivity.this);
-                // FIXME: if exposure-time is e.g. 30ms, we get pictures at:
-                // 30, 60, 90, 120 and will always select 120 if we chose 10fps.
-                // better method would be to
-                // a) if auto-mode: estimate exposure time, provide framerate-chooser
-                // b) if manual mode: add some time for processing, provide choice for every frame, every 2nd frame, etc.
                 _fps = Float.parseFloat(prefs.getString("pref_framerates", "10."));
 
                 // ------------ resolution and setup reader and output surfaces
                 String selected_res = prefs.getString("pref_resolutions", ""); // this gives the value
                 if (selected_res != "") {
                     // FIXME: expose to preferences!
-                    //Size[] sizes = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP).getOutputSizes(ImageFormat.YUV_420_888);
                     // FIXME: max framerate with JPEG is 150ms == ca. 6.6 fps on GS5
                     // GS6: 36-40ms
+                    Size[] sizes;
+                    if(_format == "JPEG") {
+                        sizes = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP).getOutputSizes(ImageFormat.JPEG);
+                    }else{
+                        sizes = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP).getOutputSizes(ImageFormat.YUV_420_888);
+                    }
+                    /*
                     Size[] sizes = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP).getOutputSizes(ImageFormat.JPEG);
+                    // get min frame durations for diff. image sizes
+                    for(Size size : sizes) {
+                        long dur = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP).getOutputMinFrameDuration(ImageFormat.JPEG, size);
+                        Log.d("StreamMap", "MinFrameDuration for "+size.getWidth()+"x"+size.getHeight()+": "+dur/1000000.);
+                    }
+                    */
 
-                    _img_width = sizes[Integer.parseInt(selected_res)].getWidth(); //  .get(Integer.parseInt(selected_res)).width;
+                    /*
+                    Size[] sizes = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP).getOutputSizes(ImageFormat.YUV_420_888);
+                    // get min frame durations for diff. image sizes
+                    for(Size size : sizes) {
+                        //long dur = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP).getOutputMinFrameDuration(ImageFormat.YUV_420_888, size);
+                        long dur = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP).getOutputStallDuration(ImageFormat.YUV_420_888, size);
+                        Log.d("StreamMap", "StallDuration for "+size.getWidth()+"x"+size.getHeight()+": "+dur/1000000.);
+                    }
+                    */
+
+                    _img_width = sizes[Integer.parseInt(selected_res)].getWidth();
                     _img_height = sizes[Integer.parseInt(selected_res)].getHeight();
                 }
 
-                reader = ImageReader.newInstance(_img_width, _img_height, ImageFormat.JPEG, 2);
-                //reader = ImageReader.newInstance(_img_width, _img_height, ImageFormat.YUV_420_888, 2); // YUV is way faster
-
-                /*
-                outputSurfaces = new ArrayList<Surface>(2);
-                outputSurfaces.add(reader.getSurface());
-                outputSurfaces.add(new Surface(textureView.getSurfaceTexture()));
-                */
-
+                //reader = ImageReader.newInstance(_img_width, _img_height, ImageFormat.JPEG, 3);
+                if(_format == "JPEG") {
+                    reader = ImageReader.newInstance(_img_width, _img_height, ImageFormat.JPEG, 5); // YUV is way faster
+                }else{
+                    reader = ImageReader.newInstance(_img_width, _img_height, ImageFormat.YUV_420_888, 5); // YUV is way faster
+                }
             } catch (CameraAccessException e) {
                 e.printStackTrace();
             }
@@ -396,8 +405,6 @@ public class MainActivity extends Activity {
             super.onCaptureCompleted(session, request, result);
             _diff = System.currentTimeMillis() - last_pic_ts;
             last_pic_ts = System.currentTimeMillis();
-            //Log.d("EXP-TIME:", ""+result.get(CaptureResult.SENSOR_EXPOSURE_TIME));
-            //Log.d("EXP-TIME:", ""+result.get(CaptureResult.SENSOR_SENSITIVITY));
         }
     };
 
@@ -420,7 +427,6 @@ public class MainActivity extends Activity {
 
     protected void takePicture() {
         if (null == cameraDevice) {
-            //Log.e(TAG, "cameraDevice is null");
             return;
         }
 
@@ -428,9 +434,10 @@ public class MainActivity extends Activity {
         // this is SD-storage, android/data/de.weis.multisensor_grabber/files/
         _dir = new File(_extdir + File.separator + _seq_timestamp);
         _dir.mkdirs();
+        _path = _dir.getPath() + File.separator;
 
         try {
-            fileos = new FileOutputStream(new File(_dir.getPath() + File.separator + _seq_timestamp + ".xml"));
+            fileos = new FileOutputStream(new File(_path + _seq_timestamp + ".xml"));
         } catch (FileNotFoundException e) {
             e.printStackTrace();
         }
@@ -459,7 +466,6 @@ public class MainActivity extends Activity {
 
             Surface surface = new Surface(texture);
 
-            //captureRequestBuilder.addTarget(reader.getSurface());
             List<android.view.Surface> surfaces = new ArrayList<Surface>(2);
             surfaces.add(surface);
             surfaces.add(reader.getSurface());
@@ -469,41 +475,103 @@ public class MainActivity extends Activity {
                 @Override
                 public void onImageAvailable(ImageReader myreader) {
                     Image image = null;
-                    try {
-                        image = myreader.acquireLatestImage();
-                        if(image == null){
+
+                        image = myreader.acquireNextImage();
+                        if (image == null) {
                             return;
                         }
 
-                        //Log.d("_diff", "-------------------------------- " + (System.currentTimeMillis() - last_pic_ts));
-                        if ((System.currentTimeMillis() - last_pic_ts) >= 1000. / _fps) {
-                            //Log.d("1000/fps", "--------------------------------================================== " + 1000. / _fps);
-                            _diff = System.currentTimeMillis() - last_pic_ts;
-                            last_pic_ts = System.currentTimeMillis();
+                        long curr = image.getTimestamp();
 
-                            ByteBuffer buffer = image.getPlanes()[0].getBuffer();
-                            byte[] bytes = new byte[buffer.capacity()];
-                            buffer.get(bytes);
-                            save(bytes);
+                        if ((curr - last_pic_ts) >=  1000000000. / (_fps+1.)) {
+                            _diff = (curr - last_pic_ts) / 1000000;
+                            Log.d("___DIFF", ""+_diff);
+
+                            //Log.d("diff: ", "" + _diff);
+                            last_pic_ts = curr;
+
+                            String fname= "";
+
+                            try{
+                                if(_format == "JPEG") {
+                                    fname = "pic" + _cnt + ".jpg";
+                                    File file = new File(_path + fname);
+                                    FileOutputStream output = null;
+                                    try {
+                                        output = new FileOutputStream(file);
+                                    } catch (FileNotFoundException e) {
+                                        e.printStackTrace();
+                                    }
+
+                                    ByteBuffer buffer = image.getPlanes()[0].getBuffer();
+                                    byte[] bytes = new byte[buffer.capacity()];
+                                    buffer.get(bytes);
+                                    output.write(bytes);
+                                    output.close();
+                                    //save_jpeg(bytes); //createRunnable(bytes).run(); // try to run in another thread...(does not seem to be faster)
+                                }else {
+                                    fname = "pic" + _cnt + ".yuv";
+                                    File file = new File(_path + fname);
+                                    FileOutputStream output = new FileOutputStream(file);
+                                    output = new FileOutputStream(file);
+
+                                    ByteBuffer buffer;
+                                    byte[] bytes;
+                                    ByteBuffer prebuffer = ByteBuffer.allocate(16);
+                                    prebuffer.putInt(image.getWidth())
+                                            .putInt(image.getHeight())
+                                            .putInt(image.getPlanes()[1].getPixelStride())
+                                            .putInt(image.getPlanes()[1].getRowStride());
+                                    /*
+                                    Log.d("--------width: ", ""+image.getWidth());
+                                    Log.d("--------height: ", ""+image.getHeight());
+                                    Log.d("--------rstride: ", ""+image.getPlanes()[1].getRowStride());
+                                    Log.d("--------pstride: ", ""+image.getPlanes()[1].getPixelStride());
+                                    */
+
+                                    output.write(prebuffer.array()); // write meta information to file
+                                    // Now write the actual planes.
+                                    for (int i = 0; i < 3; i++) {
+                                        buffer = image.getPlanes()[i].getBuffer();
+                                        bytes = new byte[buffer.remaining()]; // makes byte array large enough to hold image
+                                        buffer.get(bytes); // copies image from buffer to byte array
+                                        output.write(bytes);    // write the byte array to file
+                                    }
+                                    output.close();
+                                }
+                            } catch (IOException e) {
+                                e.printStackTrace();
+                            }
+
+                            try {
+                                save_xml(fname);
+                            } catch (IOException e) {
+                                e.printStackTrace();
+                            }
                         }
-                    } catch (FileNotFoundException e) {
-                        e.printStackTrace();
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    } finally {
-                        if (image != null) {
-                            image.close();
-                        }
-                    }
+                    image.close();
                 }
 
-                private void save(byte[] bytes) throws IOException {
+                /*
+                private Runnable createRunnable(final byte[] bytes){
+                    Runnable aRunnable = new Runnable(){
+                        public void run(){
+                            try {
+                                save(bytes);
+                            } catch (IOException e) {
+                                e.printStackTrace();
+                            }
+                        }
+                    };
+
+                    return aRunnable;
+                }
+                */
+
+                private void save_xml(String fname) throws IOException {
+                    //Long st = System.currentTimeMillis();
                     OutputStream output = null;
                     try {
-                        String fname = "pic" + _cnt + ".jpg";
-                        File file = new File(_dir.getPath() + File.separator + fname);
-                        output = new FileOutputStream(file);
-                        output.write(bytes);
 
                         try {
                             serializer.startTag(null, "Frame");
@@ -534,6 +602,7 @@ public class MainActivity extends Activity {
                                 serializer.attribute(null, "exp_time", "" + _exp_time);
                             } else {
                                 //FIXME: is it possible to get the exposure time of each single image if auto-exposure is on?
+                                //FIXME: look at the callback, for some cellphones we can get these values
                                 serializer.attribute(null, "exp_time", "-1");
                             }
 
@@ -551,18 +620,17 @@ public class MainActivity extends Activity {
 
                             serializer.endTag(null, "Frame");
                             //serializer.flush(); // FIXME: a flush at the end should be enough!
-
                         } catch (IOException e) {
                             Toast.makeText(MainActivity.this, "Serializer IOExcept: " + e, Toast.LENGTH_LONG);
-                            //Log.e("serializer", "IOException: " + e);
                         }
-                        // show inter-frame framerate (actual)
                         _cnt += 1;
                     } finally {
                         if (null != output) {
                             output.close();
                         }
                     }
+
+                    //Log.d("TIME-SAVE", "TOOK " +(System.currentTimeMillis() - st));
                 }
             };
 
@@ -576,9 +644,12 @@ public class MainActivity extends Activity {
                     /*
                     Log.e(TAG, "Available keys = " + result.getKeys().toString());
                     Log.e(TAG, "Exposure time = " + result.get(CaptureResult.SENSOR_EXPOSURE_TIME));
-			        Log.e(TAG, "Frame duration = " + result.get(CaptureResult.SENSOR_FRAME_DURATION));
+                    */
+			        //Log.e(TAG, "Frame duration = " + result.get(CaptureResult.SENSOR_FRAME_DURATION));
+                    /*
                     Log.e(TAG, "Sensor sensitivity = " + result.get(CaptureResult.SENSOR_SENSITIVITY));
                     */
+
                 }
             };
 
@@ -591,7 +662,12 @@ public class MainActivity extends Activity {
                         // this has already been built from user preferences!
 
                         session.setRepeatingRequest(_capReq.build(), captureListener, mBackgroundHandler);
-                        //session.capture(captureBuilder.build(), captureListener, mBackgroundHandler);
+
+                        /*
+                        List capreqs = new ArrayList();
+                        capreqs.add(_capReq.build());
+                        session.setRepeatingBurst(capreqs, captureListener, mBackgroundHandler);
+                        */
                     } catch (CameraAccessException e) {
                         e.printStackTrace();
                     }
@@ -669,6 +745,10 @@ public class MainActivity extends Activity {
         captureBuilder.set(CaptureRequest.COLOR_CORRECTION_ABERRATION_MODE, CaptureRequest.COLOR_CORRECTION_ABERRATION_MODE_OFF);
         captureBuilder.set(CaptureRequest.NOISE_REDUCTION_MODE, CaptureRequest.NOISE_REDUCTION_MODE_OFF);
         captureBuilder.set(CaptureRequest.CONTROL_AF_TRIGGER, CaptureRequest.CONTROL_AF_TRIGGER_CANCEL);
+        //captureBuilder.set(CaptureRequest.CONTROL_AE_EXPOSURE_COMPENSATION,);
+
+        // this command does not seem to have any effect?
+        //captureBuilder.set(CaptureRequest.SENSOR_FRAME_DURATION, (long)100*1000000);
 
         // Orientation
         int rotation = getWindowManager().getDefaultDisplay().getRotation();
@@ -758,7 +838,6 @@ public class MainActivity extends Activity {
         }
 
         try {
-            // try to get 40 images single to let the auto-modes settle
             cameraCaptureSessions.setRepeatingRequest(_capReq.build(), previewCallbackListener, mBackgroundHandler);
         } catch (CameraAccessException e) {
             e.printStackTrace();
@@ -804,7 +883,9 @@ public class MainActivity extends Activity {
     }
 
     final LocationListener locationListener = new LocationListener() {
-        public void onLocationChanged(Location location) {}
+        public void onLocationChanged(Location location) {
+            _loc = location;
+        }
         public void onProviderDisabled(String provider){}
         public void onProviderEnabled(String provider){ }
         public void onStatusChanged(String provider, int status, Bundle extras){
@@ -826,6 +907,20 @@ public class MainActivity extends Activity {
         super.onResume();
         //Log.e(TAG, "onResume");
         startBackgroundThread();
+
+        try {
+            _extdir = getExternalFilesDirs(null)[1];
+        } catch (Exception e) {
+            _extdir = getExternalFilesDirs(null)[0];
+        }
+
+        /* put it in the prefs so the user can find the files later */
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(MainActivity.this);
+        try {
+            prefs.edit().putString("pref_dir", _extdir.toString()).apply();
+        }catch (Exception e){
+            Toast.makeText(this, "Setting external directory failed", Toast.LENGTH_LONG);
+        }
 
         if (textureView.isAvailable()) {
             openCamera();
