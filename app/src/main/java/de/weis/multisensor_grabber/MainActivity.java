@@ -36,6 +36,7 @@ import android.os.Build;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.HandlerThread;
+import android.os.StatFs;
 import android.preference.PreferenceManager;
 import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
@@ -159,9 +160,20 @@ public class MainActivity extends Activity {
     TextView textview_fps;
     TextView textview_imu;
     TextView textview_camera;
+    ImageButton settingsButton;
 
     // FIXME: expose to settings
     String _format = "YUV";
+
+    public static float GbAvailable(File f) {
+        StatFs stat = new StatFs(f.getPath());
+        long bytesAvailable = 0;
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.JELLY_BEAN_MR2)
+            bytesAvailable = (long) stat.getBlockSizeLong() * (long) stat.getAvailableBlocksLong();
+        else
+            bytesAvailable = (long) stat.getBlockSize() * (long) stat.getAvailableBlocks();
+        return bytesAvailable / (1024.f * 1024.f * 1024.f);
+    }
 
     private Runnable grab_system_data = new Runnable() {
         @Override
@@ -174,7 +186,7 @@ public class MainActivity extends Activity {
 
             try{
                 bestProvider = mLocationManager.getBestProvider(criteria, false);
-                mLocationManager.requestLocationUpdates(bestProvider, 1,1, locationListener);
+                mLocationManager.requestLocationUpdates(bestProvider, 1,0.01f, locationListener);
             }catch(Exception e) {}
 
             textview_imu.setText("head: " + String.format("%.01f", _gyro_head) +
@@ -214,6 +226,8 @@ public class MainActivity extends Activity {
             }
 
             camstring += ", WB: "+ wb2string(_wb_value);
+
+            camstring += ", Free space: " + String.format("%.02f", GbAvailable(_extdir)) + " Gb";
 
             textview_camera.setText(camstring);
 
@@ -278,6 +292,7 @@ public class MainActivity extends Activity {
                         e.printStackTrace();
                     }
                     takePictureButton.setImageResource(R.mipmap.icon_rec);
+                    settingsButton.setEnabled(true);
                     Toast.makeText(getApplicationContext(), "Stopped", Toast.LENGTH_LONG).show();
                     /*
                     _pichandler.removeCallbacks(_picrunner);
@@ -285,6 +300,7 @@ public class MainActivity extends Activity {
                 } else {
                     Toast.makeText(getApplicationContext(), "Started", Toast.LENGTH_LONG).show();
                     takePictureButton.setImageResource(R.mipmap.icon_rec_on);
+                    settingsButton.setEnabled(false);
                     _recording = true;
                     takePicture();
                     /*_pichandler.postDelayed(_picrunner, 1000);*/
@@ -292,7 +308,7 @@ public class MainActivity extends Activity {
             }
         });
 
-        final ImageButton settingsButton = (ImageButton) findViewById(R.id.btn_settings);
+        settingsButton = (ImageButton) findViewById(R.id.btn_settings);
         settingsButton.setOnClickListener(
                 new android.view.View.OnClickListener() {
                     @Override
@@ -438,7 +454,6 @@ public class MainActivity extends Activity {
         // TOBI
         DateFormat sdf = new SimpleDateFormat("yyyy_MM_dd-HH_mm");
         Date netDate = (new Date(_seq_timestamp));
-        Log.d("===== datestring", ""+sdf.format(netDate));
 
         //_dir = new File(_extdir + File.separator + _seq_timestamp);
         _dir = new File(_extdir + File.separator + sdf.format(netDate));
@@ -475,7 +490,7 @@ public class MainActivity extends Activity {
 
             Surface surface = new Surface(texture);
 
-            List<android.view.Surface> surfaces = new ArrayList<Surface>(2);
+            List<android.view.Surface> surfaces = new ArrayList<Surface>(1);
             surfaces.add(surface);
             surfaces.add(reader.getSurface());
             _capReq = get_captureBuilder(surfaces);
@@ -494,7 +509,7 @@ public class MainActivity extends Activity {
 
                         if ((curr - last_pic_ts) >=  1000000000. / (_fps+1.)) {
                             _diff = (curr - last_pic_ts) / 1000000;
-                            Log.d("___DIFF", ""+_diff);
+                            //Log.d("___DIFF", ""+_diff);
 
                             //Log.d("diff: ", "" + _diff);
                             last_pic_ts = curr;
@@ -521,7 +536,6 @@ public class MainActivity extends Activity {
                                     fname = "pic" + String.format("%08d", _cnt) + ".yuv";
                                     File file = new File(_path + fname);
                                     FileOutputStream output = new FileOutputStream(file);
-                                    output = new FileOutputStream(file);
 
                                     ByteBuffer buffer;
                                     byte[] bytes;
@@ -567,6 +581,8 @@ public class MainActivity extends Activity {
                                 serializer.attribute(null, "lon", "" + _loc.getLongitude());
                                 serializer.attribute(null, "acc", "" + _loc.getAccuracy());
                                 serializer.attribute(null, "speed", "" + _loc.getSpeed());
+                                serializer.attribute(null, "bearing", "" + _loc.getBearing());
+                                serializer.attribute(null, "ts_gps", "" + _loc.getTime());
                             }catch(Exception e){
                                 serializer.attribute(null, "lat", "-1");
                                 serializer.attribute(null, "lon", "-1");
@@ -793,7 +809,7 @@ public class MainActivity extends Activity {
             mLocationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
             bestProvider = mLocationManager.getBestProvider(criteria, false);
             _loc = mLocationManager.getLastKnownLocation(bestProvider);
-            mLocationManager.requestLocationUpdates(bestProvider, 1,1, locationListener);
+            mLocationManager.requestLocationUpdates(bestProvider, 1,0.01f, locationListener);
 
             SensorManager sm = (SensorManager)getSystemService(Context.SENSOR_SERVICE);
             sm.registerListener(sel,
@@ -912,6 +928,7 @@ public class MainActivity extends Activity {
         //Log.e(TAG, "onPause");
         _recording = false;
         takePictureButton.setImageResource(R.mipmap.icon_rec);
+        settingsButton.setEnabled(true);
         closeCamera();
         stopBackgroundThread();
         super.onPause();
