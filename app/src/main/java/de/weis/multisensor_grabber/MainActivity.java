@@ -206,7 +206,7 @@ public class MainActivity extends Activity {
             */
             String camstring = "EXP: ";
             if(_fix_exp){
-                camstring += "Fixed: " + _exp_time/1000000 + "ms";
+                camstring += "Fixed: " +  String.format("%.02f", _exp_time/1000000.) + "ms";
             }else{
                 camstring += "Auto";
             }
@@ -694,7 +694,8 @@ public class MainActivity extends Activity {
         /* user prefs */
         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(MainActivity.this);
         _fix_exp=prefs.getBoolean("pref_fix_exp",false);
-        _exp_time=Long.parseLong(prefs.getString("pref_exposure","0")) * 1000000;
+        //_exp_time=Long.parseLong(prefs.getString("pref_exposure","0")) * 1000000;
+        _exp_time=(long) (Float.parseFloat(prefs.getString("pref_exposure","0")) * 1000000);
         _fix_foc = prefs.getBoolean("pref_fix_foc", false);
         _fix_iso = prefs.getBoolean("pref_fix_iso", false);
 
