@@ -154,6 +154,7 @@ public class MainActivity extends Activity {
     private TextView textview_battery;
     LocationManager mLocationManager;
     Criteria criteria = new Criteria();
+
     String bestProvider;
     android.location.Location _loc;
     TextView textview_coords;
@@ -181,12 +182,12 @@ public class MainActivity extends Activity {
             textview_battery.setText("BAT: " + String.format("%.0f", getBatteryLevel()) + "%");
             // FIXME: if we have gps-permission, but gps is off, this fails!
             try {
-                textview_coords.setText("Coordinates: " + String.format("%.03f", _loc.getLatitude()) + ", " + String.format("%.03f", _loc.getLongitude()) + ", Acc:" + _loc.getAccuracy());
+                textview_coords.setText("Coordinates: " + String.format("%.03f", _loc.getLatitude()) + ", " + String.format("%.03f", _loc.getLongitude()) + ", Acc:" + _loc.getAccuracy() + ", Altitude: " + _loc.getAltitude());
             }catch(Exception e){}
 
             try{
-                bestProvider = mLocationManager.getBestProvider(criteria, false);
-                mLocationManager.requestLocationUpdates(bestProvider, 1,0.01f, locationListener);
+                bestProvider = mLocationManager.getBestProvider(criteria, true);
+                mLocationManager.requestLocationUpdates(bestProvider, 0,0, locationListener);
             }catch(Exception e) {}
 
             textview_imu.setText("head: " + String.format("%.01f", _gyro_head) +
@@ -254,6 +255,12 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+
+        // setup the GPS criteria
+        criteria.setAccuracy(Criteria.ACCURACY_FINE);
+        criteria.setAltitudeRequired(false);
+        criteria.setCostAllowed(true);
+        criteria.setPowerRequirement(Criteria.POWER_HIGH);
 
         textview_battery = (TextView) findViewById(R.id.textview_battery);
         textview_coords = (TextView) findViewById(R.id.textview_coords);
@@ -507,7 +514,7 @@ public class MainActivity extends Activity {
 
                         long curr = image.getTimestamp();
 
-                        if ((curr - last_pic_ts) >=  1000000000. / (_fps+1.)) {
+                        if ((curr - last_pic_ts) >=  1000000000. / (_fps)) {
                             _diff = (curr - last_pic_ts) / 1000000;
                             //Log.d("___DIFF", ""+_diff);
 
@@ -579,6 +586,7 @@ public class MainActivity extends Activity {
                             try {
                                 serializer.attribute(null, "lat", "" + _loc.getLatitude());
                                 serializer.attribute(null, "lon", "" + _loc.getLongitude());
+                                serializer.attribute(null, "altitude", "" + _loc.getAltitude());
                                 serializer.attribute(null, "acc", "" + _loc.getAccuracy());
                                 serializer.attribute(null, "speed", "" + _loc.getSpeed());
                                 serializer.attribute(null, "bearing", "" + _loc.getBearing());
@@ -808,9 +816,9 @@ public class MainActivity extends Activity {
 
             manager.openCamera(cameraId, stateCallback, null);
             mLocationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
-            bestProvider = mLocationManager.getBestProvider(criteria, false);
+            bestProvider = mLocationManager.getBestProvider(criteria, true);
             _loc = mLocationManager.getLastKnownLocation(bestProvider);
-            mLocationManager.requestLocationUpdates(bestProvider, 1,0.01f, locationListener);
+            mLocationManager.requestLocationUpdates(bestProvider, 0,0, locationListener);
 
             SensorManager sm = (SensorManager)getSystemService(Context.SENSOR_SERVICE);
             sm.registerListener(sel,
@@ -928,6 +936,7 @@ public class MainActivity extends Activity {
     protected void onPause() {
         //Log.e(TAG, "onPause");
         _recording = false;
+        _cnt = 0;
         takePictureButton.setImageResource(R.mipmap.icon_rec);
         settingsButton.setEnabled(true);
         closeCamera();
