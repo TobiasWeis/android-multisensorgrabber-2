@@ -703,7 +703,12 @@ public class MainActivity extends Activity {
         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(MainActivity.this);
         _fix_exp=prefs.getBoolean("pref_fix_exp",false);
         //_exp_time=Long.parseLong(prefs.getString("pref_exposure","0")) * 1000000;
-        _exp_time=(long) (Float.parseFloat(prefs.getString("pref_exposure","0")) * 1000000);
+        try {
+            _exp_time = (long) (Float.parseFloat(prefs.getString("pref_exposure", "0")) * 1000000);
+        }catch(Exception e){
+            Toast.makeText(MainActivity.this, "Problem with ExposureValue, set to 5.0", Toast.LENGTH_SHORT).show();
+            _exp_time = (long)5.0;
+        }
         _fix_foc = prefs.getBoolean("pref_fix_foc", false);
         _fix_iso = prefs.getBoolean("pref_fix_iso", false);
 
